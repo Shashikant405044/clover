@@ -1,0 +1,23 @@
+ suspend fun authenticateClover(context: Context): CloverAuth.AuthResult? {
+        return withContext(Dispatchers.IO) {
+            var account = CloverAccount.getAccount(context)
+            if (account == null) {
+                val cloverAccounts = AccountManager.get(context)
+                    .getAccountsByType("com.clover.account")
+                if (cloverAccounts.isNotEmpty()) {
+                    account = cloverAccounts[0]
+                }
+            }
+
+            if (account == null) {
+                return@withContext null // Correctly returns null if no account
+            }
+
+            try {
+                CloverAuth.authenticate(context) // No need for 'authResult' variable
+            } catch (e: Exception) {
+                e.printStackTrace()
+                null // Correctly returns null in case of exception
+            }
+        }
+    } 
