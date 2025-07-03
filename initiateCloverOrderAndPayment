@@ -1,0 +1,28 @@
+private fun initiateCloverOrderAndPayment() {
+    if (mBalanceAmount > 0) {
+        val payableAmount = BigDecimal(mBalanceAmount)
+        isNewOrder = true
+
+        lifecycleScope.launch {
+            val (amountInCents, generatedOrderId) = mServiceDetailActivityViewModel.createOrderOnClover(
+                mPartsInvoiceLinesForOrder,
+                repairOrderPartListForOrder!!,
+                mInvoiceNumber!!,
+                payableAmount.toString(),
+                "",
+                this@MServiceDetailActivity
+            )
+
+            val cloverPaymentIntent = Intent(Intents.ACTION_CLOVER_PAY).apply {
+                putExtra(Intents.EXTRA_CLOVER_ORDER_ID, generatedOrderId)
+                putExtra(Intents.EXTRA_AMOUNT, amountInCents)
+                putExtra(Intents.EXTRA_TRANSACTION_TYPE, Intents.TRANSACTION_TYPE_PAYMENT)
+            }
+
+            // startActivityForResult(intent, 111) // Deprecated
+            startActivityForResult.launch(cloverPaymentIntent)
+        }
+    } else {
+        showErrorToast(getString(R.string.amount_zero_cant_be_paid))
+    }
+}
