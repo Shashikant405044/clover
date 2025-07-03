@@ -26,3 +26,60 @@ private fun initiateCloverOrderAndPayment() {
         showErrorToast(getString(R.string.amount_zero_cant_be_paid))
     }
 }
+
+
+
+private val startActivityForResult = registerForActivityResult(
+    ActivityResultContracts.StartActivityForResult()
+) { result: ActivityResult ->
+    when (result.resultCode) {
+        Activity.RESULT_OK -> {
+            mInvoiceActivityViewModel.fetchCloverPayments(this)
+            mInvoiceActivityViewModel.paymentDetails.observe(this) { (transactionId, paymentIdList, paymentId) ->
+                val paymentIntent = Intent(this, MPaymentResultActivity::class.java).apply {
+                    putExtra(MConstant.PAYMENT_ID, paymentId)
+                    putExtra(MConstant.PAYMENT_ID_LIST, paymentIdList.toTypedArray())
+                    putExtra(MConstant.TRANSACTION_ID, transactionId)
+                    putExtra(MConstant.FROM, MConstant.FROM_CLOVER_PAYMENT)
+                }
+                startActivity(paymentIntent)
+            }
+        }
+
+        Activity.RESULT_CANCELED -> {
+            // Handle user cancellation
+            val orderId = mPreferenceHelper.getString(CLOVER_ORDER_ID)
+            lifecycleScope.launch(Dispatchers.IO) {
+                val cloverAccount = CloverAccount.getAccount(this@MInvoiceActivity) ?: run {
+                    val cloverAccounts = AccountManager.get(this@MInvoiceActivity)
+                        .getAccountsByType("com.clover.account")
+                    cloverAccounts.firstOrNull()
+                }
+
+                val orderConnector = OrderConnector(this@MInvoiceActivity, cloverAccount, null)
+                try {
+                    orderId?.let { orderConnector.deleteOrder(it) }
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MInvoiceActivity,
+                            R.string.payment_canceled_so_order_deleted,
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    withContext(Dispatchers.Main) {
+                        showErrorToast(e.message.toString())
+                    }
+                }
+            }
+        }
+
+        else -> {
+            // Handle payment failure or unexpected result
+            val errorMessage = result.data?.getStringExtra(Intents.EXTRA_FAILURE_MESSAGE)
+            Log.d("CloverPaymentResult", "Payment Failed: $errorMessage")
+        }
+    }
+}
+
