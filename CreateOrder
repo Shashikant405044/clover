@@ -1,0 +1,43 @@
+suspend fun createTestOrderOnClover(context: Context): Pair<Long, String> = withContext(Dispatchers.IO) {
+    try {
+        // Get Clover Account
+        val mAccount = CloverAccount.getAccount(context)
+            ?: AccountManager.get(context).getAccountsByType("com.clover.account").firstOrNull()
+
+        if (mAccount == null) {
+            return@withContext Pair(0L, "Clover account not found")
+        }
+
+        // Initialize OrderConnector
+        val orderConnector = OrderConnector(context, mAccount, null)
+        orderConnector.connect()
+
+        // Create new Order
+        val order = orderConnector.createOrder(Order().setManualTransaction(true))
+
+        // Static order details
+        val invoiceNumber = "INV12345"
+        val amount = 15000L  // ₹150.00 in cents
+        val note = "Test Order - Static Data"
+        val itemName = "Sample Item"
+
+        // Create and add line item
+        val lineItem = LineItem()
+            .setName("RO $invoiceNumber $itemName")
+            .setAlternateName("AltName $invoiceNumber")
+            .setPrice(amount)
+
+        orderConnector.addCustomLineItem(order.id, lineItem, true)
+
+        // Set order note and external reference
+        order.setNote(note)
+        order.setExternalReferenceId(invoiceNumber)
+        orderConnector.updateOrder(order)
+
+        // Return success with amount and order ID
+        Pair(amount, order.id)
+    } catch (e: Exception) {
+        // Handle any error
+        Pair(0L, "Error: ${e.localizedMessage ?: "Unknown error"}")
+    }
+}
